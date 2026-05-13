@@ -1,0 +1,18 @@
+# Runtime data — DB, logs, CSV exports, scheduler output
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
