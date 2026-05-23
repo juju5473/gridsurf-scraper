@@ -33,6 +33,7 @@ from pathlib import Path
 
 import requests
 import schedule
+import notifier
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 
@@ -206,7 +207,7 @@ def normalize_gpu_name(raw: str) -> str:
     return s[:64]
 
 def make_snapshot_id() -> str:
-    return datetime.now(timezone.utc).strftime("snap_%Y%m%d_%H%M%S")
+    return datetime.now(timezone.utc).strftime("snap_%Y%m%d_%H%M%S_%f")[:24]
 
 # ── INSERT helper ─────────────────────────────────────────────────────────────
 
@@ -715,6 +716,10 @@ def collect(conn: sqlite3.Connection, providers: list = None):
         f"akash={counts['akash']} spheron={counts['spheron']}  total={total}"
     )
     print_summary(conn, snapshot_id)
+    try:
+        notifier.send_summary(conn, snapshot_id, errors)
+    except Exception as e:
+        log.warning(f"Email notification failed: {e}")
     return snapshot_id
 
 # ── Entry point ───────────────────────────────────────────────────────────────

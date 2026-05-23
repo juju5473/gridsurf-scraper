@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GridSurf Price Intelligence</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  /* ── Reset & base ──────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0b1120;
+    --surface:  #131e30;
+    --surface2: #1a2840;
+    --border:   #243047;
+    --text:     #e2e8f0;
+    --muted:    #64748b;
+    --blue:     #3b82f6;
+    --green:    #22c55e;
+    --yellow:   #f59e0b;
+    --red:      #ef4444;
+    --purple:   #a855f7;
+    --vast:     #f59e0b;
+    --runpod:   #3b82f6;
+    --spheron:  #22c55e;
+    --radius:   10px;
+    --shadow:   0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────── */
+  .container { max-width: 1400px; margin: 0 auto; padding: 0 20px 40px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+
+  @media (max-width: 900px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    .grid-4 { grid-template-columns: repeat(2,1fr); }
+  }
+  @media (max-width: 480px) {
+    .grid-4 { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ── Components ────────────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+
+  .card-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title span { font-size: 14px; }
+
+  /* ── Header ────────────────────────────────────────────────── */
+  header {
+    padding: 24px 0 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .logo-text h1 {
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #fff 0%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .logo-text p {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.25);
+    border-radius: 20px;
+    padding: 4px 12px;
+    color: var(--green);
+    font-weight: 600;
+    font-size: 12px;
+  }
+  .status-badge.offline {
+    background: rgba(239,68,68,0.1);
+    border-color: rgba(239,68,68,0.25);
+    color: var(--red);
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+  .status-badge.offline .status-dot {
+    background: var(--red);
+    animation: none;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; } 50% { opacity: 0.3; }
+  }
+
+  /* ── Stats bar ─────────────────────────────────────────────── */
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.1;
+  }
+  .stat-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(36,48,71,0.6);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ── Provider badges ───────────────────────────────────────── */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-vast    { background: rgba(245,158,11,0.15); color: var(--vast);    border: 1px solid rgba(245,158,11,0.3); }
+  .badge-runpod  { background: rgba(59,130,246,0.15);  color: var(--runpod);  border: 1px solid rgba(59,130,246,0.3); }
+  .badge-spheron { background: rgba(34,197,94,0.15);   color: var(--spheron); border: 1px solid rgba(34,197,94,0.3); }
+
+  /* ── Price cells ───────────────────────────────────────────── */
+  .price-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .price-best  { color: var(--green); font-weight: 600; }
+  .price-worst { color: var(--red); }
+  .price-na    { color: var(--border); }
+
+  /* ── Alert badges ──────────────────────────────────────────── */
+  .alert-yes {
+    background: rgba(239,68,68,0.15);
+    color: var(--red);
+    border: 1px solid rgba(239,68,68,0.3);
+    padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;
+  }
+  .alert-no {
+    color: var(--muted); font-size: 12px;
+  }
+
+  /* ── Section header ────────────────────────────────────────── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .section-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  /* ── Chart container ───────────────────────────────────────── */
+  .chart-container {
+    position: relative;
+    height: 320px;
+  }
+
+  /* ── GPU selector ──────────────────────────────────────────── */
+  .gpu-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .gpu-tab {
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .gpu-tab:hover { border-color: var(--blue); color: var(--blue); }
+  .gpu-tab.active {
+    background: rgba(59,130,246,0.15);
+    border-color: var(--blue);
+    color: var(--blue);
+    font-weight: 600;
+  }
+
+  /* ── Budget calculator ─────────────────────────────────────── */
+  .budget-form {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+    align-items: flex-end;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .form-group input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 7px 12px;
+    font-size: 13px;
+    width: 110px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-group input:focus { border-color: var(--blue); }
+  .btn {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { opacity: 0.85; }
+
+  /* ── Volatility heatmap ────────────────────────────────────── */
+  .vol-cell {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    min-width: 64px;
+    text-align: center;
+  }
+
+  /* ── Loading & error ───────────────────────────────────────── */
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: var(--muted);
+    gap: 10px;
+    font-size: 13px;
+  }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-msg {
+    text-align: center;
+    padding: 32px;
+    color: var(--red);
+    font-size: 13px;
+  }
+  .error-msg code {
+    display: block;
+    margin-top: 8px;
+    color: var(--muted);
+    font-family: monospace;
+    font-size: 12px;
+  }
+
+  /* ── Savings badge ─────────────────────────────────────────── */
+  .savings {
+    color: var(--green);
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  /* ── Misc ──────────────────────────────────────────────────── */
+  .refresh-note {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .mb-20 { margin-bottom: 20px; }
+  .mb-24 { margin-bottom: 24px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ── Header ──────────────────────────────────────────────── -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🌊</div>
+      <div class="logo-text">
+        <h1>GridSurf Price Intelligence</h1>
+        <p>GPU cloud marketplace analytics &amp; forecasting</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <span id="last-updated">Loading...</span>
+      <div id="status-badge" class="status-badge offline">
+        <div class="status-dot"></div>
+        <span id="status-text">Connecting</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Stats bar ───────────────────────────────────────────── -->
+  <div class="grid-4 mb-24" id="stats-bar">
+    <div class="stat-card"><div class="stat-label">Snapshots</div><div class="stat-value" id="stat-snapshots">—</div><div class="stat-sub">collected</div></div>
+    <div class="stat-card"><div class="stat-label">Total Offers</div><div class="stat-value" id="stat-rows">—</div><div class="stat-sub">price records</div></div>
+    <div class="stat-card"><div class="stat-label">Days of Data</div><div class="stat-value" id="stat-days">—</div><div class="stat-sub">history</div></div>
+    <div class="stat-card"><div class="stat-label">Providers</div><div class="stat-value" id="stat-providers">—</div><div class="stat-sub">Vast · RunPod · Spheron</div></div>
+  </div>
+
+  <!-- ── Spread Alerts + Price Table ─────────────────────────── -->
+  <div class="grid-2 mb-24">
+
+    <!-- Spread Alerts -->
+    <div class="card">
+      <div class="card-title"><span>⚡</span> Live Spread Alerts</div>
+      <div id="alerts-content" class="table-wrap">
+        <div class="loading"><div class="spinner"></div> Loading alerts…</div>
+      </div>
+    </div>
+
+    <!-- Price Comparison -->
+    <div class="card">
+      <div class="card-title"><span>💰</span> Price Comparison — Top GPUs</div>
+      <div id="price-content" class="table-wrap">
+        <div class="loading"><div class="spinner"></div> Loading prices…</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── 24h Forecast chart ───────────────────────────────────── -->
+  <div class="card mb-24">
+    <div class="card-title"><span>📈</span> 24-Hour Price Forecast</div>
+    <div class="gpu-tabs" id="gpu-tabs"></div>
+    <div class="chart-container">
+      <canvas id="forecast-chart"></canvas>
+    </div>
+  </div>
+
+  <!-- ── Budget Calculator + Volatility Heatmap ─────────────── -->
+  <div class="grid-2 mb-24">
+
+    <!-- Budget Calculator -->
+    <div class="card">
+      <div class="card-title"><span>🧮</span> Budget Calculator</div>
+      <div class="budget-form">
+        <div class="form-group">
+          <label>Budget ($/hr)</label>
+          <input type="number" id="budget-input" value="1.00" step="0.10" min="0.01">
+        </div>
+        <div class="form-group">
+          <label>Job hours</label>
+          <input type="number" id="hours-input" value="4" step="1" min="1">
+        </div>
+        <button class="btn" onclick="runBudget()">Find Options</button>
+      </div>
+      <div id="budget-results">
+        <div class="loading" style="padding:20px"><div class="spinner"></div> Enter a budget above</div>
+      </div>
+    </div>
+
+    <!-- Volatility Heatmap -->
+    <div class="card">
+      <div class="card-title"><span>🌡</span> Volatility Heatmap</div>
+      <div id="volatility-content" class="table-wrap">
+        <div class="loading"><div class="spinner"></div> Loading…</div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /container -->
+
+<script>
+const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:8080'
+  : window.location.origin;
+const CHART_GPUS = ['RTX_4090', 'H100_SXM', 'A100_40GB', 'L40S'];
+const PROVIDER_COLORS = {
+  runpod:  { line: '#3b82f6', band: 'rgba(59,130,246,0.10)'  },
+  spheron: { line: '#22c55e', band: 'rgba(34,197,94,0.10)'   },
+  vast:    { line: '#f59e0b', band: 'rgba(245,158,11,0.10)'  },
+};
+
+let forecastChart = null;
+let activeGpu = CHART_GPUS[0];
+
+// ── Utility ──────────────────────────────────────────────────────
+
+function fmt(v, dec = 4) {
+  return v != null ? `$${Number(v).toFixed(dec)}` : '<span class="price-na">—</span>';
+}
+function fmtNum(n) {
+  return n != null ? Number(n).toLocaleString() : '—';
+}
+function providerBadge(p) {
+  const key = p?.toLowerCase();
+  return `<span class="badge badge-${key}">${p}</span>`;
+}
+function volColor(v) {
+  if (v <= 0.05) return { bg: 'rgba(34,197,94,0.18)',   color: '#22c55e' };
+  if (v <= 0.15) return { bg: 'rgba(34,197,94,0.08)',   color: '#86efac' };
+  if (v <= 0.30) return { bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b' };
+  if (v <= 0.50) return { bg: 'rgba(239,68,68,0.12)',   color: '#fca5a5' };
+  return                { bg: 'rgba(239,68,68,0.22)',   color: '#ef4444' };
+}
+
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+// ── Stats ─────────────────────────────────────────────────────
+
+async function loadStats() {
+  try {
+    const d = await fetchJSON(`${API}/api/stats`);
+    document.getElementById('stat-snapshots').textContent = fmtNum(d.total_snapshots);
+    document.getElementById('stat-rows').textContent      = fmtNum(d.total_rows);
+    document.getElementById('stat-days').textContent      = d.days_of_data;
+    document.getElementById('stat-providers').textContent = d.providers;
+
+    const ts = new Date(d.last_updated);
+    document.getElementById('last-updated').textContent =
+      `Updated ${ts.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+
+    const badge = document.getElementById('status-badge');
+    const dot   = badge.querySelector('.status-dot');
+    badge.classList.remove('offline');
+    document.getElementById('status-text').textContent = 'Live';
+    dot.style.background = 'var(--green)';
+  } catch {
+    document.getElementById('status-badge').classList.add('offline');
+    document.getElementById('status-text').textContent = 'Offline';
+    document.getElementById('last-updated').textContent = 'API server not running';
+  }
+}
+
+// ── Alerts ────────────────────────────────────────────────────
+
+async function loadAlerts() {
+  const el = document.getElementById('alerts-content');
+  try {
+    const data = await fetchJSON(`${API}/api/alerts`);
+    if (!data.length) { el.innerHTML = '<p style="color:var(--muted);padding:16px;font-size:13px">No significant spreads detected.</p>'; return; }
+
+    let html = `<table>
+      <thead><tr>
+        <th>GPU</th><th>Cheapest</th><th>Spread</th><th>Save/100h</th><th>Alert</th>
+      </tr></thead><tbody>`;
+
+    for (const r of data) {
+      const alertEl = r.is_alert
+        ? `<span class="alert-yes">⚠ YES</span>`
+        : `<span class="alert-no">—</span>`;
+      const priceList = Object.entries(r.prices)
+        .map(([p, v]) => `${providerBadge(p)} $${Number(v).toFixed(4)}`)
+        .join(' ');
+      html += `<tr>
+        <td><strong>${r.gpu_name}</strong><br><small style="color:var(--muted)">${priceList}</small></td>
+        <td>${providerBadge(r.cheapest_provider)}<br><span class="price-best">$${r.cheapest_price.toFixed(4)}</span></td>
+        <td class="price-cell" style="color:var(--yellow)">$${r.spread.toFixed(4)}</td>
+        <td class="savings">$${r.savings_per_100h.toFixed(2)}</td>
+        <td>${alertEl}</td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">Could not load alerts<code>${e.message}</code></div>`;
+  }
+}
+
+// ── Price Comparison ──────────────────────────────────────────
+
+async function loadPrices() {
+  const el = document.getElementById('price-content');
+  try {
+    const data = await fetchJSON(`${API}/api/summary`);
+    if (!data.length) { el.innerHTML = '<p style="color:var(--muted);padding:16px">No data.</p>'; return; }
+
+    const allProviders = ['vast', 'runpod', 'spheron'];
+    let html = `<table><thead><tr>
+      <th>GPU</th>
+      <th>Vast</th><th>RunPod</th><th>Spheron</th>
+    </tr></thead><tbody>`;
+
+    for (const row of data.slice(0, 12)) {
+      const prices = allProviders.map(p => {
+        const pv = row.providers[p];
+        if (!pv) return null;
+        return pv.avg_price;
+      });
+      const validPrices = prices.filter(v => v != null);
+      const minP = validPrices.length ? Math.min(...validPrices) : null;
+
+      html += `<tr><td><strong>${row.gpu_name}</strong></td>`;
+      for (let i = 0; i < allProviders.length; i++) {
+        const p = prices[i];
+        if (p == null) {
+          html += `<td class="price-na price-cell">—</td>`;
+        } else {
+          const cls = (p === minP) ? 'price-best' : '';
+          const star = (p === minP) ? ' ★' : '';
+          html += `<td class="price-cell ${cls}">$${p.toFixed(4)}${star}</td>`;
+        }
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">Could not load prices<code>${e.message}</code></div>`;
+  }
+}
+
+// ── Forecast Chart ────────────────────────────────────────────
+
+function buildGpuTabs() {
+  const el = document.getElementById('gpu-tabs');
+  el.innerHTML = CHART_GPUS.map(g =>
+    `<button class="gpu-tab${g === activeGpu ? ' active' : ''}" onclick="selectGpu('${g}')">${g}</button>`
+  ).join('');
+}
+
+function selectGpu(gpu) {
+  activeGpu = gpu;
+  buildGpuTabs();
+  loadForecast();
+}
+
+async function loadForecast() {
+  try {
+    const data = await fetchJSON(`${API}/api/forecast?gpu=${activeGpu}`);
+
+    // Group by provider, sorted by timestamp
+    const byProvider = {};
+    for (const d of data) {
+      if (d.gpu_class !== activeGpu) continue;
+      (byProvider[d.provider] ??= []).push(d);
+    }
+    for (const pvs of Object.values(byProvider)) {
+      pvs.sort((a, b) => a.forecast_hours_ahead - b.forecast_hours_ahead);
+    }
+
+    const labels = Object.values(byProvider)[0]?.map(d => {
+      const ts = new Date(d.forecast_timestamp);
+      return ts.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) +
+        (ts.getHours() === 0 ? ' ' + ts.toLocaleDateString([], {month:'short', day:'numeric'}) : '');
+    }) ?? [];
+
+    const datasets = [];
+    for (const [provider, points] of Object.entries(byProvider)) {
+      const c = PROVIDER_COLORS[provider] ?? { line: '#94a3b8', band: 'rgba(148,163,184,0.1)' };
+      // Upper CI band → fills to lower CI (+1)
+      datasets.push({
+        label: `${provider}_ci_upper`,
+        data: points.map(p => p.price_forecast_upper),
+        borderWidth: 0, pointRadius: 0,
+        backgroundColor: c.band,
+        fill: '+1',
+        tension: 0.3,
+      });
+      // Lower CI band
+      datasets.push({
+        label: `${provider}_ci_lower`,
+        data: points.map(p => p.price_forecast_lower),
+        borderWidth: 0, pointRadius: 0,
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.3,
+      });
+      // Forecast line
+      datasets.push({
+        label: provider,
+        data: points.map(p => p.price_forecast),
+        borderColor: c.line,
+        borderWidth: 2,
+        backgroundColor: c.line,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        fill: false,
+        tension: 0.3,
+      });
+    }
+
+    const ctx = document.getElementById('forecast-chart').getContext('2d');
+    if (forecastChart) forecastChart.destroy();
+
+    forecastChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: {
+              color: '#94a3b8',
+              font: { size: 12 },
+              filter: item => !item.text.includes('_ci'),
+              usePointStyle: true, pointStyle: 'line',
+            },
+          },
+          tooltip: {
+            backgroundColor: '#1a2840',
+            borderColor: '#243047',
+            borderWidth: 1,
+            titleColor: '#e2e8f0',
+            bodyColor: '#94a3b8',
+            callbacks: {
+              label: ctx => {
+                if (ctx.dataset.label.includes('_ci')) return null;
+                return ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(4)}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: '#64748b', font: { size: 10 }, maxTicksLimit: 8 },
+            grid: { color: 'rgba(36,48,71,0.6)' },
+          },
+          y: {
+            ticks: {
+              color: '#64748b', font: { size: 11 },
+              callback: v => `$${Number(v).toFixed(3)}`,
+            },
+            grid: { color: 'rgba(36,48,71,0.6)' },
+          },
+        },
+      },
+    });
+  } catch (e) {
+    document.getElementById('forecast-chart').parentElement.innerHTML =
+      `<div class="error-msg">Could not load forecast<code>${e.message}</code></div>`;
+  }
+}
+
+// ── Budget Calculator ─────────────────────────────────────────
+
+async function runBudget() {
+  const budget  = parseFloat(document.getElementById('budget-input').value) || 1.0;
+  const hours   = parseInt(document.getElementById('hours-input').value) || 4;
+  const el      = document.getElementById('budget-results');
+  el.innerHTML  = '<div class="loading"><div class="spinner"></div> Calculating…</div>';
+  try {
+    const data = await fetchJSON(`${API}/api/windows?budget=${budget}`);
+    if (!data.length) {
+      el.innerHTML = `<p style="color:var(--muted);font-size:13px;padding:8px">No GPUs available under $${budget}/hr.</p>`;
+      return;
+    }
+    let html = `<table><thead><tr>
+      <th>Provider</th><th>GPU</th><th>p50 Price</th><th>Est. Total</th><th>Avail %</th><th>Volatility</th>
+    </tr></thead><tbody>`;
+    for (const r of data.slice(0, 10)) {
+      const total    = (r.price_p50 * hours).toFixed(2);
+      const avPct    = Math.round(r.availability * 100);
+      const vc       = volColor(r.volatility);
+      html += `<tr>
+        <td>${providerBadge(r.provider)}</td>
+        <td><strong>${r.gpu_class}</strong></td>
+        <td class="price-best price-cell">$${r.price_p50.toFixed(4)}/hr</td>
+        <td class="price-cell">$${total} (${hours}h)</td>
+        <td style="color:${avPct >= 70 ? 'var(--green)' : avPct >= 40 ? 'var(--yellow)' : 'var(--red)'}">${avPct}%</td>
+        <td><span class="vol-cell" style="background:${vc.bg};color:${vc.color}">${r.volatility.toFixed(3)}</span></td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    if (data.length > 10) html += `<p style="color:var(--muted);font-size:11px;margin-top:8px;padding:0 4px">+${data.length - 10} more options</p>`;
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">Error<code>${e.message}</code></div>`;
+  }
+}
+
+// ── Volatility Heatmap ────────────────────────────────────────
+
+async function loadVolatility() {
+  const el = document.getElementById('volatility-content');
+  try {
+    const data = await fetchJSON(`${API}/api/volatility`);
+    if (!data.length) { el.innerHTML = '<p style="color:var(--muted);padding:16px">No data.</p>'; return; }
+
+    let html = `<table><thead><tr>
+      <th>GPU Class</th><th>Avg Vol</th><th>Max Vol</th><th>Providers</th>
+    </tr></thead><tbody>`;
+    for (const r of data.slice(0, 20)) {
+      const vc = volColor(r.avg_volatility);
+      const vcMax = volColor(r.max_volatility);
+      html += `<tr>
+        <td><strong>${r.gpu_class}</strong></td>
+        <td><span class="vol-cell" style="background:${vc.bg};color:${vc.color}">${r.avg_volatility.toFixed(3)}</span></td>
+        <td><span class="vol-cell" style="background:${vcMax.bg};color:${vcMax.color}">${r.max_volatility.toFixed(3)}</span></td>
+        <td>${r.providers.map(p => providerBadge(p)).join(' ')}</td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">Could not load volatility<code>${e.message}</code></div>`;
+  }
+}
+
+// ── Init & refresh ────────────────────────────────────────────
+
+async function loadAll() {
+  await Promise.allSettled([
+    loadStats(),
+    loadAlerts(),
+    loadPrices(),
+    loadForecast(),
+    loadVolatility(),
+  ]);
+}
+
+buildGpuTabs();
+runBudget();
+loadAll();
+setInterval(loadAll, 60_000);
+</script>
+</body>
+</html>

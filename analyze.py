@@ -226,8 +226,11 @@ def cmd_volatility(conn: sqlite3.Connection):
             COUNT(DISTINCT snapshot_id)                       AS snapshots,
             ROUND(AVG(price_per_gpu_hr), 4)                   AS mean_price,
             ROUND(
-                SQRT(AVG(price_per_gpu_hr * price_per_gpu_hr)
-                     - AVG(price_per_gpu_hr) * AVG(price_per_gpu_hr))
+                COALESCE(SQRT(MAX(
+                    AVG(price_per_gpu_hr * price_per_gpu_hr)
+                    - AVG(price_per_gpu_hr) * AVG(price_per_gpu_hr),
+                    0.0
+                )), 0.0)
             , 4)                                              AS std_dev,
             ROUND(MIN(price_per_gpu_hr), 4)                   AS p0,
             ROUND(MAX(price_per_gpu_hr), 4)                   AS p100
@@ -252,6 +255,8 @@ def cmd_volatility(conn: sqlite3.Connection):
     )
     print(f"{'─'*80}")
     for r in rows:
+        if r['provider'] is None or r['gpu_name'] is None:
+            continue
         print(
             f"  {r['provider']:<10} {r['gpu_name']:<18} "
             f"{r['snapshots']:>6} {r['mean_price']:>8.4f} "

@@ -1,6 +1,9 @@
 # Runtime data — DB, logs, CSV exports, scheduler output
 data/
 
+# Credentials
+.env
+
 # Python
 __pycache__/
 *.py[cod]
